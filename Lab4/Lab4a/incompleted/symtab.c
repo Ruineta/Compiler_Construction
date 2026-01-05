@@ -67,7 +67,8 @@ int compareType(Type* type1, Type* type2) {
   } else return 0;
 }
 
-void freeType(Type* type) {  if (type == NULL) return;  switch (type->typeClass) {
+void freeType(Type* type) {
+  switch (type->typeClass) {
   case TP_INT:
   case TP_CHAR:
     free(type);
@@ -81,16 +82,17 @@ void freeType(Type* type) {  if (type == NULL) return;  switch (type->typeClass)
 
 int sizeOfType(Type* type) {
   // TODO
-  switch (type->typeClass) {
-    case TP_INT:
-      return 1;
-    case TP_CHAR:
-      return 1;
-    case TP_ARRAY:
-      return type->arraySize * sizeOfType(type->elementType);
-    default:
-      return 0;
+  // --- ADDED: compute size in words (4 bytes each) ---
+  switch (type->typeClass)
+  {
+  case TP_INT:
+    return INT_SIZE;
+  case TP_CHAR:
+    return CHAR_SIZE;
+  case TP_ARRAY:
+    return (type->arraySize * sizeOfType(type->elementType));
   }
+  return 0;
 }
 
 /******************* Constant utility ******************************/
@@ -207,7 +209,6 @@ Object* createParameterObject(char *name, enum ParamKind kind) {
 }
 
 void freeObject(Object* obj) {
-  if (obj == NULL) return;
   switch (obj->kind) {
   case OBJ_CONSTANT:
     free(obj->constAttrs->value);
@@ -300,7 +301,7 @@ void initSymTab(void) {
   symtab = (SymTab*) malloc(sizeof(SymTab));
   symtab->globalObjectList = NULL;
   symtab->program = NULL;
-  symtab->currentScope = createScope(NULL);  // Create global scope
+  symtab->currentScope = NULL;
   
   readcFunction = createFunctionObject("READC");
   declareObject(readcFunction);
@@ -351,29 +352,49 @@ void exitBlock(void) {
 }
 
 void declareObject(Object* obj) {
-  // TODO: rewrite the function to fill all values of attributes
-  if (obj->kind == OBJ_PARAMETER) {
-    Object* owner = symtab->currentScope->owner;
-    switch (owner->kind) {
+  // --- ADDED: insert object into scope and set offsets/frame sizes ---
+  // Determine target scope list (current scope or global list if none)
+  Object *owner;
+
+  if (symtab->currentScope == NULL) // biến globalObject, không có scope, không có frameSize
+    addObject(&(symtab->globalObjectList), obj);
+  else
+  {
+    switch (obj->kind)
+    {
+    case OBJ_VARIABLE:
+      obj->varAttrs->scope = symtab->currentScope;
+      obj->varAttrs->localOffset = symtab->currentScope->frameSize;
+      symtab->currentScope->frameSize += sizeOfType(obj->varAttrs->type);
+      break;
+    case OBJ_PARAMETER:
+      obj->paramAttrs->scope = symtab->currentScope;
+      obj->paramAttrs->localOffset = symtab->currentScope->frameSize;
+      symtab->currentScope->frameSize++;
+      owner = symtab->currentScope->owner;
+      switch (owner->kind)
+      {
+      case OBJ_FUNCTION:
+        addObject(&(owner->funcAttrs->paramList), obj);
+        owner->funcAttrs->paramCount++;
+        break;
+      case OBJ_PROCEDURE:
+        addObject(&(owner->procAttrs->paramList), obj);
+        owner->procAttrs->paramCount++;
+        break;
+      default:
+        break;
+      }
+      break;
     case OBJ_FUNCTION:
-      addObject(&owner->funcAttrs->paramList, obj);
-      owner->funcAttrs->paramCount++;
+      obj->funcAttrs->scope->outer = symtab->currentScope;
       break;
     case OBJ_PROCEDURE:
-      addObject(&owner->procAttrs->paramList, obj);
-      owner->procAttrs->paramCount++;
+      obj->procAttrs->scope->outer = symtab->currentScope;
       break;
     default:
       break;
     }
-    obj->paramAttrs->scope = symtab->currentScope;
-    obj->paramAttrs->localOffset = symtab->currentScope->frameSize;
-    symtab->currentScope->frameSize += sizeOfType(obj->paramAttrs->type);
-  }
-  addObject(&symtab->currentScope->objList, obj);
-  if (symtab->currentScope->outer == NULL) {
-    addObject(&symtab->globalObjectList, obj);
+    addObject(&(symtab->currentScope->objList), obj);
   }
 }
-
-
