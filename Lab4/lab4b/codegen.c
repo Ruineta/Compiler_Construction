@@ -20,11 +20,31 @@ extern Object* writelnProcedure;
 CodeBlock* codeBlock;
 
 void genVariableAddress(Object* var) {
-  // TODO
+  //todo
+  // Tạm thời: mọi biến ở level 0 (frame hiện tại)
+  int level = 0;
+  int offset = VARIABLE_OFFSET(var);
+  genLA(level, offset);
 }
 
 void genVariableValue(Object* var) {
-  // TODO
+  //todo
+  // Tạm thời: mọi biến ở level 0 (frame hiện tại)
+  int level = 0;
+  int offset = VARIABLE_OFFSET(var);
+  genLV(level, offset);
+}
+
+void genParameterValue(Object* param) {
+  // Tạm thời: mọi parameter ở level 0 (frame hiện tại)
+  int level = 0;
+  int offset = PARAMETER_OFFSET(param);
+  genLV(level, offset);
+}
+
+void genFunctionCall(Object* func) {
+  // Tạm thời: chưa xét function call, halt
+  genHL();
 }
 
 int isPredefinedFunction(Object* func) {
